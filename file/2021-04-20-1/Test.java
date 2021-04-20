@@ -1,95 +1,93 @@
-import java.io.*;
+import largeFloat.LFloat;
 
+//example case using LFloat;
 class Test
 {
-	static int length = 200;
-	static LFloat f8 = new LFloat(2);
-	static String[] series = new String[length];
-	static LFloat[] taylor = new LFloat[10000];
-	
-	static int total = 1000;
-	static LFloat[] xs = new LFloat[10000];
-	static LFloat[] ys = new LFloat[10000];
-	
 	public static void main(String[] args)
 	{
-		generateTaylor();
-		generateX();
-		generateY();
-		//print();
-		doSave();
+		//6*4 bytes float, which has 62 bits exponent, and 6*4*8 bits significand.
+		//f6 is used as a convenient generator, whose use can be seen later.
+		//6 is the "length" of the LFloat, and length=2 means the number is a bit more precise than double.
+		
+		/*
+		common operations:
+			add
+			sub
+			mul
+			div
+			selfAdd
+			selfSub
+		
+			copy(): return a copy of self
+			copy(int length): return a copy of self, but with specific "length" (transform)
+		
+			log
+			exp
+		*/
+		
+		LFloat f6 = new LFloat(6);
+		LFloat[] num = new LFloat[100];
+		
+		//trivial constructor;
+		num[0] = new LFloat(6, "1.0");
+		System.out.println("num[0] = " + num[0]);
+		
+		//convenient generator, which generates a LFloat with the same length;
+		num[1] = f6.num("2.0");
+		System.out.println("num[1] = " + num[1]);
+		
+		//operations must happen between numbers of the same "length"
+		num[2] = num[1].add(num[0]);
+		System.out.println("num[2] = " + num[2]);
+		
+		num[2].selfAdd(num[0]);
+		System.out.println("num[2] = " + num[2]);
+		
+		num[3] = num[2].mul(num[2]);
+		System.out.println("num[3] = " + num[3]);
+		
+		num[4] = num[2].div(num[3]);
+		System.out.println("num[4] = " + num[4]);
+		
+		
+		//extremity test:
+		
+		num[5] = f6.num("1e1000000000000000");
+		System.out.println("num[5] = " + num[5]);
+		
+		num[6] = f6.num("-0.2e-1000000000000000");
+		System.out.println("num[6] = " + num[6]);
+		
+		
+		//log and exp accuracy test:
+		
+		num[7] = LFloat.exp(LFloat.log(f6.num(10)).mul(f6.num("100000000000000")));
+		System.out.println("num[7] = " + num[7]);
+		
+		//fun game of mathematics:
+		LFloat pi = calcPi(50);
+		System.out.println("pi = " + pi + " :-)");
 	}
 	
-	public static void generateTaylor()
+	//calculate pi using "Newton / Euler Convergence Transformation", from https://en.wikipedia.org/wiki/Approximations_of_π
+	public static LFloat calcPi(int length)
 	{
-		taylor[0] = f8.num(2);
-		for(int i = 1; i < length; i++)
+		//increase calculation accuracy
+		int _length = length + 1;
+		LFloat lf = new LFloat(_length);
+		
+		LFloat ans = lf.num(0);
+		LFloat xn = lf.num(2);
+		int n = 1;
+		while(xn.expo > ans.expo - 32 * _length)
 		{
-			LFloat offset = f8.num(-0.4);
-			
-			LFloat mul = f8.num(-2).mul(offset.add(f8.num(i))).mul(offset.add(f8.num(i + 1)));
-			taylor[i] = taylor[i - 1].div(mul);
-			//System.out.println(taylor[i]);
+			ans.selfAdd(xn);
+			xn = xn.mul(lf.num(n).div(lf.num(2 * n + 1)));
+			n += 1;
 		}
-		for(int i = 0; i < length; i++)
-		{
-			series[i] = taylor[i].toString();
-		}
-	}
-	
-	public static void generateX()
-	{
-		for(int i = 0; i < total; i++)
-		{
-			xs[i] = f8.num(0.1 * i);
-		}
-	}
-	
-	public static void generateY()
-	{
-		for(int i = 0; i < total; i++)
-		{
-			LFloat x = xs[i].mul(xs[i]);
-			LFloat xn = f8.num(1);
-			LFloat sum = f8.num(0);
-			
-			for(int j = 0; j < length; j++)
-			{
-				sum.selfAdd(xn.mul(taylor[j]));
-				xn = xn.mul(x);
-			}
-			ys[i] = sum;
-		}
-	}
-	
-	public static void print()
-	{
-		for(int i = 0; i < total; i++)
-		{
-			System.out.println(ys[i]);
-		}
-	}
-	
-	public static void doSave()
-	{
-		try
-		{
-			StringBuffer result = new StringBuffer();
-			for(int i = 0; i < total; i++)
-			{
-				result.append(xs[i] + ", ");
-			}
-			result.append("\n");
-			for(int i = 0; i < total; i++)
-			{
-				result.append(ys[i] + ", ");
-			}
-			
-			BufferedWriter bw = new BufferedWriter(new FileWriter("./data0.txt"));
-			bw.write(result.toString());
-			bw.close();
-		}
-		catch(Exception e)
-		{}
+		
+		ans.normalize();
+		//return accuracy to normal
+		return ans.copy(length);
 	}
 }
